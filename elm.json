@@ -1,11 +1,11 @@
 {
     "type": "package",
-    "name": "indique/elm-pairdict",
-    "summary": "lookup value-pairs from the left or the right",
+    "name": "indique/elm-keysdict",
+    "summary": "lookup values from many directions",
     "license": "MIT",
     "version": "6.0.1",
     "exposed-modules": [
-        "PairDict"
+        "KeysDict"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {

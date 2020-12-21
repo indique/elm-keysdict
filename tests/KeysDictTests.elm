@@ -1,14 +1,26 @@
-module PairDictTest exposing (..)
+module KeysDictTests exposing (suite)
 
 
 import Test exposing (Test, test, describe)
 import Expect
 
-import PairDict exposing (PairDict, empty)
+import KeysDict exposing (KeysDict, Uniqueness, empty, unique)
 import AssocList as AssocDict exposing (Dict)
 
 import Json.Encode as Encode
 import Json.Decode as Decode
+
+
+suite: Test
+suite=
+  describe "pair-dict"
+    [ createTest
+    , scanScanTest
+    , inTest
+    , outTest
+    , shapeTest
+    , readmeExamplesTest
+    ]
 
 
 type alias CharWithCode=
@@ -21,11 +33,11 @@ at1: CharWithCode
 at1= { code= 1, char= 'B' }
 
 
-of2: PairDict CharWithCode Int Char
-of2=
-  empty .code .char
-  |>PairDict.putIn at0
-  |>PairDict.putIn at1
+with2: KeysDict CharWithCode
+with2=
+  empty [ unique .code, unique .char ]
+  |>KeysDict.putIn at0
+  |>KeysDict.putIn at1
 
 listOf2: List CharWithCode
 listOf2=
@@ -34,9 +46,9 @@ listOf2=
 type alias BracketMatch=
   { open: Char, closed: Char }
 
-brackets: PairDict BracketMatch Char Char
+brackets: KeysDict BracketMatch
 brackets=
-  PairDict.fromList .open .closed
+  KeysDict.fromList [ unique .open, unique .closed ]
     [ { open= '(', closed= ')' }
     , { open= '{', closed= '}' }
     ]
@@ -46,21 +58,23 @@ type alias CasedLetter=
   , uppercase: Char
   }
 
-createPairDictTest: Test
-createPairDictTest=
+createTest: Test
+createTest=
   describe "create"
     [ describe "fromList is the same as empty |>inserting"
         [ test "empty  is  fromList []"
           <|\()->
-              PairDict.equal
-                (empty .code .char)
-                (PairDict.fromList .code .char [])
+              KeysDict.equal
+                (empty [ unique .code, unique .char ])
+                (KeysDict.fromList [ unique .code, unique .char ] [])
               |>Expect.true "empty equal to fromList []"
         , test "fromList gives same result as inserting"
           <|\()->
-              PairDict.equal
-                of2
-                (PairDict.fromList .code .char listOf2)
+              KeysDict.equal
+                with2
+                (KeysDict.fromList [ unique .code, unique .char ]
+                  listOf2
+                )
               |>Expect.true "fromList gives same result as inserting"
         , test "fromList ignores duplicates as in example"
           <|\()->
@@ -73,8 +87,10 @@ createPairDictTest=
                   , { lowercase= 'c', uppercase= 'C' } --put in
                   ]
               in
-              PairDict.size
-                (PairDict.fromList .lowercase .uppercase badList)
+              KeysDict.size
+                (KeysDict.fromList [ unique .lowercase, unique .uppercase ]
+                  badList
+                )
               |>Expect.equal 3
         , test "fromDict dictFromLeft returns an equal dict"
           <|\()->
@@ -85,33 +101,35 @@ createPairDictTest=
                   |>AssocDict.insert 'b' 'B'
 
                 lowerUpperLetters=
-                  PairDict.fromDict
+                  KeysDict.fromDict
                     (\k v-> { lowercase= k, uppercase= v })
-                    .lowercase .uppercase
+                    [ unique .lowercase, unique .uppercase ]
                     lowerToUpperLetters
               in
               Expect.true "expected fromDict toDict returns an equal dict"
                 (AssocDict.eq
                   lowerToUpperLetters
-                  (PairDict.toDict lowerUpperLetters)
+                  (KeysDict.toDict .lowercase .uppercase
+                    lowerUpperLetters
+                  )
                 )
         ]
     ]
 
-scanPairDictScanTest: Test
-scanPairDictScanTest=
+scanScanTest: Test
+scanScanTest=
   describe "scan"
     [ describe "size"
         [ test "size of empty is 0"
           <|\()->
-              PairDict.size (empty .code .char)
+              KeysDict.size (empty [ unique .code, unique .char ])
               |>Expect.equal 0
         , test "dict has the same size as a list of unique values"
           <|\()->
               Expect.equal 42
-                (PairDict.size
-                  (PairDict.fromList
-                    Tuple.first Tuple.second
+                (KeysDict.size
+                  (KeysDict.fromList
+                    [ unique Tuple.first, unique Tuple.second ]
                     (List.range 0 41
                     |>List.map (\i-> ( i, i ))
                     )
@@ -121,16 +139,16 @@ scanPairDictScanTest=
     , describe "access"
         (let
           casedLetters=
-            PairDict.empty .lowercase .uppercase
-            |>PairDict.putIn { lowercase= 'a', uppercase= 'A' }
-            |>PairDict.putIn { lowercase= 'b', uppercase= 'B' }
+            KeysDict.empty [ unique .lowercase, unique .uppercase ]
+            |>KeysDict.putIn { lowercase= 'a', uppercase= 'A' }
+            |>KeysDict.putIn { lowercase= 'b', uppercase= 'B' }
 
           lowercase char=
-            PairDict.access .uppercase char
+            KeysDict.access .uppercase char
               casedLetters
             |>Maybe.map .lowercase
           uppercase char=
-            PairDict.access .lowercase char
+            KeysDict.access .lowercase char
               casedLetters
             |>Maybe.map .uppercase
         in
@@ -150,16 +168,16 @@ scanPairDictScanTest=
       <|\()->
           let
             letterCodes=
-              PairDict.fromList .letter .code 
+              KeysDict.fromList [ unique .letter, unique .code ]
                 [ { letter= 'a', code= 97 }
                 , { letter= 'b', code= 98 }
                 ]
             fancyCompetingLetterCodes=
-              PairDict.empty .code .letter
-              |>PairDict.putIn { code= 98, letter= 'b' }
-              |>PairDict.putIn { code= 97, letter= 'a' }
+              empty [ unique .code, unique .letter ]
+              |>KeysDict.putIn { code= 98, letter= 'b' }
+              |>KeysDict.putIn { code= 97, letter= 'a' }
           in
-          PairDict.equal
+          KeysDict.equal
             letterCodes
             fancyCompetingLetterCodes
           |>Expect.true "reversed list with switched left right fromList equal to fromList"
@@ -168,27 +186,27 @@ scanPairDictScanTest=
           <|\()->
             let
               isEmpty=
-                PairDict.emptyOrMore
+                KeysDict.emptyOrMore
                   { ifEmpty= True
                   , ifMore= \_ _-> False
                   }
             in
             Expect.true "isEmpty for filled False, ifEmpty True"
               ((&&)
-                (isEmpty (empty .code .char))
-                (not (isEmpty of2))
+                (isEmpty (empty [ unique .code, unique .char ]))
+                (not (isEmpty with2))
               )
         , test "most recently inserted"
           <|\()->
             let
               mostRecentlyInserted=
-                PairDict.emptyOrMore
+                KeysDict.emptyOrMore
                   { ifMore= \pair _-> Just pair
                   , ifEmpty= Nothing
                   }
             in
             mostRecentlyInserted
-              (PairDict.fromList .lowercase .uppercase
+              (KeysDict.fromList [ unique .lowercase, unique .uppercase ]
                 [ { lowercase= 'a', uppercase= 'A' },
                   { lowercase= 'b', uppercase= 'B' }
                 ]
@@ -198,46 +216,72 @@ scanPairDictScanTest=
         ]
     ]
 
-inPairDictTest: Test
-inPairDictTest=
+inTest: Test
+inTest=
   describe "in"
     [ describe "insert"
         [ test "insert is ignored for duplicates"
           <|\()->
-              PairDict.size
-                (of2
-                |>PairDict.putIn at0
-                |>PairDict.putIn at1
+              KeysDict.size
+                (with2
+                |>KeysDict.putIn at0
+                |>KeysDict.putIn at1
                 )
               |>Expect.equal 2
         , test "access code is Just letter of inserted pair"
           <|\()->
-              empty .code .char
-              |>PairDict.putIn at1
-              |>PairDict.access .code (.code at1)
+              empty [ unique .code, unique .char ]
+              |>KeysDict.putIn at1
+              |>KeysDict.access .code (.code at1)
               |>Maybe.map .char
                 |>Expect.equal (Just (.char at1))
         , test "access code is Nothing if not of inserted pair"
           <|\()->
-              empty .code .char
-              |>PairDict.putIn at1
-              |>PairDict.access .code (.code at0)
+              empty [ unique .code, unique .char ]
+              |>KeysDict.putIn at1
+              |>KeysDict.access .code (.code at0)
               |>Maybe.map .char
                 |>Expect.equal Nothing
         , test "access char is Just left of inserted pair"
           <|\()->
-              empty .code .char
-              |>PairDict.putIn at1
-              |>PairDict.access .char (.char at1)
+              empty [ unique .code, unique .char ]
+              |>KeysDict.putIn at1
+              |>KeysDict.access .char (.char at1)
               |>Maybe.map .code
                 |>Expect.equal (Just (.code at1))
         , test "access char is Nothing if not of inserted pair"
           <|\()->
-              empty .code .char
-              |>PairDict.putIn at1
-              |>PairDict.access .char (.char at0)
+              empty [ unique .code, unique .char ]
+              |>KeysDict.putIn at1
+              |>KeysDict.access .char (.char at0)
               |>Maybe.map .code
                 |>Expect.equal Nothing
+        , test "put in example"
+          <|\()->
+              let
+                result=
+                  KeysDict.empty [ unique .lowercase, unique .uppercase ]
+                    --lowercase and uppercase are unique keys across each value
+                  |>KeysDict.putIn { lowercase= 'b', uppercase= 'B', rating= 0.5 }
+                      --put in 
+                  |>KeysDict.putIn { lowercase= 'a', uppercase= 'A', rating= 0.5 }
+                      --put in, because rating is not a key
+                  |>KeysDict.putIn { lowercase= 'b', uppercase= 'C', rating= 0 }
+                      --ignored, the left value already exists
+                  |>KeysDict.putIn { lowercase= 'c', uppercase= 'A', rating= 0 }
+                      --ignored, the right value already exists
+                  |>KeysDict.putIn { lowercase= 'c', uppercase= 'C', rating= 0.6 }
+                      --put in
+              in
+              KeysDict.equal
+                result
+                (KeysDict.fromList [ unique .lowercase, unique .uppercase ]
+                  [ { lowercase= 'c', uppercase= 'C', rating= 0.6 }
+                  , { lowercase= 'b', uppercase= 'B', rating= 0.5 }
+                  , { lowercase= 'a', uppercase= 'A', rating= 0.5 }
+                  ]
+                )
+              |>Expect.true "keys are unique, others aren't"
         ]
     , let
         numberNamedOperators=
@@ -250,20 +294,20 @@ inPairDictTest=
           , { operator= '-', name= "negate" }
           ]
         validNamedOperators=
-          PairDict.union
-            (PairDict.fromList .operator .name
+          KeysDict.union
+            (KeysDict.fromList [ unique .operator, unique .name ]
               custumNamedOperators
             )
-            (PairDict.fromList .operator .name
+            (KeysDict.fromList [ unique .name, unique .operator ]
               numberNamedOperators
             )
         fromListOfConcatenated=
-          PairDict.fromList .operator .name
+          KeysDict.fromList [ unique .name, unique .operator ]
             (numberNamedOperators
             ++custumNamedOperators
             )
         encode=
-          PairDict.encode
+          KeysDict.encode
             (\{ operator, name }->
               Encode.object
                 [ ( "operator"
@@ -283,49 +327,39 @@ inPairDictTest=
             ++(encode fromListOfConcatenated)
             ++")"
             )
-            (PairDict.equal
+            (KeysDict.equal
               validNamedOperators
               fromListOfConcatenated
             )
     ]
 
-outPairDictTest: Test
-outPairDictTest=
+outTest: Test
+outTest=
   describe "out"
     [ test "add and remove code leaves it unchanged"
       <|\()->
-          of2
-          |>PairDict.putIn { code= 2, char= 'C' }
-          |>PairDict.remove .code 2
-          |>Expect.equal of2
+          with2
+          |>KeysDict.putIn { code= 2, char= 'C' }
+          |>KeysDict.remove .code 2
+          |>Expect.equal with2
     , test "add and remove char leaves it unchanged"
       <|\()->
-          of2
-          |>PairDict.putIn { code= 2, char= 'C' }
-          |>PairDict.remove .char 'C'
-          |>Expect.equal of2
+          with2
+          |>KeysDict.putIn { code= 2, char= 'C' }
+          |>KeysDict.remove .char 'C'
+          |>Expect.equal with2
     ]
 
 
-shapePairDictTest: Test
-shapePairDictTest=
+shapeTest: Test
+shapeTest=
   describe "shape"
-    [ test "codes are the same as of the list"
-      <|\()->
-          Expect.equal
-            (of2 |>PairDict.values .code)
-            (listOf2 |>List.reverse |>List.map .code)
-    , test "chars are the same as of the list"
-      <|\()->
-          Expect.equal
-            (of2 |>PairDict.values .char)
-            (listOf2 |>List.reverse |>List.map .char)
-    , test "fold works as in the example"
+    [ test "fold works as in the example"
       <|\()->
           let
             openingAndClosing=
               brackets
-              |>PairDict.fold
+              |>KeysDict.fold
                   (\{ open, closed } acc->
                     acc ++[ String.fromList [ open, closed ] ]
                   )
@@ -337,23 +371,23 @@ shapePairDictTest=
       <|\()->
           let
             digitNames=
-              PairDict.empty .number .name
-              |>PairDict.putIn { number= 0, name= "zero" }
-              |>PairDict.putIn { number= 1, name= "one" }
+              KeysDict.empty [ unique .number, unique .name ]
+              |>KeysDict.putIn { number= 0, name= "zero" }
+              |>KeysDict.putIn { number= 1, name= "one" }
 
             mathSymbolNames=
               digitNames
-              |>PairDict.map
+              |>KeysDict.map
                   (\{ number, name }->
                     { symbol= String.fromInt number, name= name }
                   )
-                  .symbol .name
-              |>PairDict.putIn { symbol= "+", name= "plus" }
+                  [ unique .symbol, unique .name ]
+              |>KeysDict.putIn { symbol= "+", name= "plus" }
           in
-          Expect.true "mapped PairDict equal to fromList"
-            (PairDict.equal
+          Expect.true "mapped KeysDict equal to fromList"
+            (KeysDict.equal
               mathSymbolNames
-              (PairDict.fromList .symbol .name
+              (KeysDict.fromList [ unique .symbol, unique .name ]
                 [ { symbol= "0", name= "zero" }
                 , { symbol= "1", name= "one" }
                 , { symbol= "+", name= "plus" }
@@ -364,29 +398,30 @@ shapePairDictTest=
       <|\()->
           let
             casedLetters=
-              PairDict.fromList .lowercase .uppercase
+              KeysDict.fromList [ unique .lowercase, unique .uppercase ]
                 [ { uppercase= 'A', lowercase= 'a' }
                 , { uppercase= 'B', lowercase= 'b' }
                 ]
-            lowerFromUpper=
-              PairDict.toDict casedLetters
+            lowerFromUppercase=
+              KeysDict.toDict .uppercase .lowercase
+                casedLetters
           in
-          Expect.true "PairDict.fromList toDict equal to AssocDict.fromList"
+          Expect.true "KeysDict.fromList toDict equal to AssocDict.fromList"
             (AssocDict.eq
-              lowerFromUpper
-              (AssocDict.fromList [ ( 'a', 'A' ), ( 'b', 'B' ) ])
+              lowerFromUppercase
+              (AssocDict.fromList [ ( 'A', 'a' ), ( 'B', 'b' ) ])
             )
-    , pairDictEncodeDecodeTest
+    , encodeDecodeTest
     ]
 
-pairDictEncodeDecodeTest: Test
-pairDictEncodeDecodeTest=
-  test "encoded & decoded PairDict is the same"
+encodeDecodeTest: Test
+encodeDecodeTest=
+  test "encoded & decoded KeysDict is the same"
   <|\()->
       let
         encoded=
-          of2
-          |>PairDict.encode
+          with2
+          |>KeysDict.encode
               (\{ code, char }->
                 Encode.object
                   [ ( "code", Encode.int code )
@@ -396,7 +431,7 @@ pairDictEncodeDecodeTest=
         encodedDecoded=
           encoded
           |>Decode.decodeValue
-              (PairDict.decode .code .char
+              (KeysDict.decode [ unique .code, unique .char ]
                 (Decode.map2 CharWithCode
                   (Decode.field "code" Decode.int)
                   (Decode.field "char"
@@ -408,7 +443,7 @@ pairDictEncodeDecodeTest=
       case encodedDecoded of
         Ok decoded->
           Expect.true "encoded |>decoded equal to before"
-            (PairDict.equal decoded of2)
+            (KeysDict.equal decoded with2)
         
         Err err->
           Expect.fail (Decode.errorToString err)
@@ -427,14 +462,14 @@ readmeExamplesTest=
           let
             typeChar character=
               brackets
-              |>PairDict.access .open character
+              |>KeysDict.access .open character
               |>Maybe.map
                   (\{ closed }->
                     String.fromList [ character, closed ]
                   )
               |>Maybe.withDefault
                   (brackets
-                  |>PairDict.access .closed character
+                  |>KeysDict.access .closed character
                   |>Maybe.map
                       (\{ open }->
                         String.fromList [ open, character ]
@@ -449,15 +484,14 @@ readmeExamplesTest=
     , test "cased letters"
       <|\()->
           let
-            lowerUppercaseLetters: PairDict CasedLetter Char Char
             lowerUppercaseLetters=
-              PairDict.empty .lowercase .uppercase
-              |>PairDict.putIn { lowercase= 'a', uppercase= 'A' }
-              |>PairDict.putIn { lowercase= 'b', uppercase= 'B' }
-              |>PairDict.putIn { lowercase= 'c', uppercase= 'C' }
+              KeysDict.empty [ unique .lowercase, unique .uppercase ]
+              |>KeysDict.putIn { lowercase= 'a', uppercase= 'A' }
+              |>KeysDict.putIn { lowercase= 'b', uppercase= 'B' }
+              |>KeysDict.putIn { lowercase= 'c', uppercase= 'C' }
 
             upperCase char=
-              PairDict.access .lowercase char lowerUppercaseLetters
+              KeysDict.access .lowercase char lowerUppercaseLetters
               |>Maybe.map .uppercase
           in
           Expect.equal
@@ -467,12 +501,13 @@ readmeExamplesTest=
       <|\()->
           let
             elementAtomicNumberPairdict=
-              PairDict.fromList .element .atomicNumber
+              KeysDict.fromList
+                [ unique .element, unique .atomicNumber ]
                 [ { element= Hydrogen, atomicNumber= 1 }
                 , { element= Helium, atomicNumber= 2 }
                 ]
             atomicNumberByElement=
-              PairDict.toDict
+              KeysDict.toDict .element .atomicNumber
                 elementAtomicNumberPairdict
           in
           Expect.equal

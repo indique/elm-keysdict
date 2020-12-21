@@ -1,5 +1,5 @@
-# PairDict
-Lookup value-pairs from the left or the right.
+# KeysDict
+Have many keys to lookup values.
 
 Let's compare
 
@@ -12,26 +12,30 @@ Let's compare
       → < 🔑= 1, 🏠= 🍐 |
         < 🔑= 2, 🏠= 🍐 |
 
-> Going through while comparing your `🔑`... Ah! Here it is:
+        (🔑 is unique)
 
-        🍐
+> Going through while comparing your `🔑`.
 
-### `PairDict`
+        🍐 where `🔑` is `1`
+
+### `KeysDict`
 
 > You want the pair where `🗝️` is `1` and the pair where `🔑` is `0`?
 
-      → < 🔑= 0, 🗝️= 2 >
-        < 🔑= 2, 🗝️= 0 >
-        < 🔑= 1, 🗝️= 1 > ←
+      → < 🔑= 0, 🏠= 🍐, 🗝️= 2 >
+        < 🔑= 2, 🏠= 🌳, 🗝️= 0 >
+        < 🔑= 1, 🏠= 🍐, 🗝️= 1 > ←
 
-> Going through while checking every pair, if `🗝️` is equal, then, if `🔑` is equal... Ah! Here they are:
+        (🔑 & 🗝️ are unique)
 
-        🔑 is 1 where 🗝️ is 1  and   🗝️ is 2 where 🔑 is 0
+> Going through while checking every pair, if `🗝️` is equal, then, if `🔑` is equal.
+
+        🔑= 1, 🗝️= 1 where 🗝️ is 1    🔑= 0, 🗝️= 2 where 🔑 is 0
 
 &nbsp;
 
 
-## 👍 How to `PairDict`
+## 👍 How to `KeysDict`
 
 ## Example: cased letters
 ```elm
@@ -40,15 +44,16 @@ type alias CasedLetter=
   , uppercase: Char
   }
 
-lowerUppercaseLetters: PairDict CasedLetter Char Char
+lowerUppercaseLetters: KeysDict CasedLetter
 lowerUppercaseLetters=
-  PairDict.empty .lowercase .uppercase
-  |>PairDict.putIn { lowercase= 'a', uppercase= 'A' }
-  |>PairDict.putIn { lowercase= 'b', uppercase= 'B' }
-  |>PairDict.putIn { lowercase= 'c', uppercase= 'C' }
+  KeysDict.empty [ unique .lowercase, unique .uppercase ]
+  |>KeysDict.putIn { lowercase= 'a', uppercase= 'A' }
+  |>KeysDict.putIn { lowercase= 'b', uppercase= 'B' }
+  |>KeysDict.putIn { lowercase= 'c', uppercase= 'C' }
 
 uppercase char=
-  PairDict.access .lowercase char lowerUppercaseLetters
+  KeysDict.access .lowercase char
+    lowerUppercaseLetters
   |>Maybe.map .uppercase
 ```
 try in the [ellie for the example cased letters](https://ellie-app.com/bQtcqGFXrgza1)
@@ -60,54 +65,50 @@ type Element=
   Hydrogen
   | Helium
 
-elementAtomicNumberPairdict=
-  PairDict.fromList .element .atomicNumber
+elementAtomicNumberKeysDict=
+  KeysDict.fromList [ unique .atomicNumber, unique .element ]
     [ { element= Hydrogen, atomicNumber= 1 }
     , { element= Helium, atomicNumber= 2 }
     ]
 
 atomicNumberByElement=
-  PairDict.toDict
-    elementAtomicNumberPairdict
+  KeysDict.toDict [ unique .element, unique .atomicNumber ]
+    elementAtomicNumberKeysDict
 ```
 
 ## Example: brackets
 You have pairs that belong together:
 ```elm
 brackets=
-  PairDict.empty .opening .closing
-  |>PairDict.putIn { opening= '(', closing= ')' }
-  |>PairDict.putIn { opening= '{', closing= '}' }
+  KeysDict.empty [ unique .opening, unique .closing ]
+  |>KeysDict.putIn { opening= '(', closing= ')' }
+  |>KeysDict.putIn { opening= '{', closing= '}' }
 
 typeChar character=
-  brackets
-  |>PairDict.access .open character
-  |>Maybe.map
-      (\{ closed }->
-        String.fromList [ character, closed ]
-      )
-  |>Maybe.withDefault
-      (brackets
-      |>PairDict.access .closed character
-      |>Maybe.map
-          (\{ open }->
-            String.fromList [ open, character ]
-          )
-      |>Maybe.withDefault
-          (String.fromChar character)
-      )
+  case brackets |>KeysDict.access .open character of
+    Just { closed }->
+      String.fromList [ character, closed ]
+
+    Nothing->
+      case brackets |>KeysDict.access .closed character
+        of
+        Just \{ open }->
+          String.fromList [ open, character ]
+          
+        Nothing->
+          String.fromChar character
 
 "Typing (: " ++(typeChar '(') ++". Even }: " ++(typeChar '}')
 ```
 &nbsp;
 
 
-## 👎 How not to `PairDict`
+## 👎 How not to `KeysDict`
 
 ## Example: automatic answers
 ```elm
 answers=
-  PairDict.fromList .youSay .answer
+  KeysDict.fromList .youSay .answer
     [ { youSay= "Hi", answer= "Hi there!" }
     , { youSay= "Bye", answer=  "Ok, have a nice day and spread some love." }
     , { youSay= "How are you", answer= "I don't have feelings :(" }
@@ -121,7 +122,7 @@ please use a `Dict` where it is more appropriate: **`Dict`s are for one-way acce
 ## Example: translation, synonymes...
 ```elm
 englishGerman=
-  PairDict.fromList .english .german
+  KeysDict.fromList .english .german
     [ { english= "elm", german= "Ulme" }
     , { english= "git", german= "Schwachkopf" }
     , { german= "Rüster", english= "elm" }
@@ -137,10 +138,10 @@ Please take a look at [elm-bidict](https://github.com/Janiczek/elm-bidict)
 Similar to the previous example:
 ```elm
 partners=
-  PairDict.empty
-  |>PairDict.putIn { partner= "Ann", partnerOfPartner= "Alan" }
-  |>PairDict.putIn { partner= "Alex", partnerOfPartner= "Alastair" }
-  |>PairDict.putIn { partner= "Alan", partnerOfPartner= "Ann" }
+  KeysDict.empty
+  |>KeysDict.putIn { partner= "Ann", partnerOfPartner= "Alan" }
+  |>KeysDict.putIn { partner= "Alex", partnerOfPartner= "Alastair" }
+  |>KeysDict.putIn { partner= "Alan", partnerOfPartner= "Ann" }
       --wait, this is no duplicate and gets putIned?
 ```
-A `PairDict` ony makes sense, when the **left & right sides describe something different**.
+A `KeysDict` ony makes sense, when the **left & right sides describe something different**.
