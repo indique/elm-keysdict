@@ -56,7 +56,7 @@ uppercase char=
     lowerUppercaseLetters
   |>Maybe.map .uppercase
 ```
-try in the [ellie for the example cased letters](https://ellie-app.com/bQtcqGFXrgza1)
+try in the [ellie for the example cased letters](https://ellie-app.com/bQtcqGFXrgza1) (always a version behind)
 
 ## Example: periodic table
 
@@ -66,13 +66,14 @@ type Element=
   | Helium
 
 elementAtomicNumberKeysDict=
-  KeysDict.fromList [ unique .atomicNumber, unique .element ]
+  KeysDict.fromList
+    [ unique .atomicNumber, unique .element ]
     [ { element= Hydrogen, atomicNumber= 1 }
     , { element= Helium, atomicNumber= 2 }
     ]
 
 atomicNumberByElement=
-  KeysDict.toDict [ unique .element, unique .atomicNumber ]
+  KeysDict.toDict .element .atomicNumber
     elementAtomicNumberKeysDict
 ```
 
@@ -85,13 +86,12 @@ brackets=
   |>KeysDict.putIn { opening= '{', closing= '}' }
 
 typeChar character=
-  case brackets |>KeysDict.access .open character of
+  case KeysDict.access .open character brackets of
     Just { closed }->
       String.fromList [ character, closed ]
 
     Nothing->
-      case brackets |>KeysDict.access .closed character
-        of
+      case KeysDict.access .closed character brackets of
         Just \{ open }->
           String.fromList [ open, character ]
           
@@ -108,7 +108,7 @@ typeChar character=
 ## Example: automatic answers
 ```elm
 answers=
-  KeysDict.fromList .youSay .answer
+  KeysDict.fromList [ unique .youSay ]
     [ { youSay= "Hi", answer= "Hi there!" }
     , { youSay= "Bye", answer=  "Ok, have a nice day and spread some love." }
     , { youSay= "How are you", answer= "I don't have feelings :(" }
@@ -122,26 +122,25 @@ please use a `Dict` where it is more appropriate: **`Dict`s are for one-way acce
 ## Example: translation, synonymes...
 ```elm
 englishGerman=
-  KeysDict.fromList .english .german
+  KeysDict.fromList []
     [ { english= "elm", german= "Ulme" }
     , { english= "git", german= "Schwachkopf" }
     , { german= "Rüster", english= "elm" }
     ]
 ```
-A right → left and backwards relationship is only fitting,
-when **left or right don't have multiple translations**.
+A `KeysDict` is only effective, when there is **only one unique key**.
 
-Please take a look at [elm-bidict](https://github.com/Janiczek/elm-bidict)
+Please take a look at [elm-bidict](https://github.com/Janiczek/elm-bidict) instead!
 
 ## Example: partners, opposites...
 
 Similar to the previous example:
 ```elm
 partners=
-  KeysDict.empty
+  KeysDict.empty [ unique .partner, unique .partnerOfPartner ]
   |>KeysDict.putIn { partner= "Ann", partnerOfPartner= "Alan" }
   |>KeysDict.putIn { partner= "Alex", partnerOfPartner= "Alastair" }
   |>KeysDict.putIn { partner= "Alan", partnerOfPartner= "Ann" }
-      --wait, this is no duplicate and gets putIned?
+      --wait, this is no duplicate and is inserted
 ```
-A `KeysDict` ony makes sense, when the **left & right sides describe something different**.
+A `KeysDict` ony makes sense, when the **keys describe something different**.
