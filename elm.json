@@ -3,7 +3,7 @@
     "name": "indique/elm-keysdict",
     "summary": "lookup values from many directions",
     "license": "MIT",
-    "version": "6.0.1",
+    "version": "1.0.0",
     "exposed-modules": [
         "KeysDict"
     ],
