@@ -37,6 +37,8 @@ Let's compare
 
 ## 👍 How to `KeysDict`
 
+try the [ellie for some examples](https://ellie-app.com/bSmccsw3Rz2a1) (always a version behind)
+
 ## Example: cased letters
 ```elm
 type alias CasedLetter=
@@ -56,7 +58,6 @@ uppercase char=
     lowerUppercaseLetters
   |>Maybe.map .uppercase
 ```
-try in the [ellie for the example cased letters](https://ellie-app.com/bQtcqGFXrgza1) (always a version behind)
 
 ## Example: periodic table
 
