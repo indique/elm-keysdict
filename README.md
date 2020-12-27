@@ -1,4 +1,4 @@
-# KeysDict
+# MultiDict
 Have many keys to lookup values.
 
 Let's compare
@@ -18,7 +18,7 @@ Let's compare
 
         🍐 where `🔑` is `1`
 
-### `KeysDict`
+### `MultiDict`
 
 > You want the pair where `🗝️` is `1` and the pair where `🔑` is `0`?
 
@@ -35,7 +35,7 @@ Let's compare
 &nbsp;
 
 
-## 👍 How to `KeysDict`
+## 👍 How to `MultiDict`
 
 try the [ellie for some examples](https://ellie-app.com/bSmccsw3Rz2a1) (always a version behind)
 
@@ -46,15 +46,15 @@ type alias CasedLetter=
   , uppercase: Char
   }
 
-lowerUppercaseLetters: KeysDict CasedLetter
+lowerUppercaseLetters: MultiDict CasedLetter
 lowerUppercaseLetters=
-  KeysDict.empty [ unique .lowercase, unique .uppercase ]
-  |>KeysDict.putIn { lowercase= 'a', uppercase= 'A' }
-  |>KeysDict.putIn { lowercase= 'b', uppercase= 'B' }
-  |>KeysDict.putIn { lowercase= 'c', uppercase= 'C' }
+  MultiDict.empty [ unique .lowercase, unique .uppercase ]
+  |>MultiDict.putIn { lowercase= 'a', uppercase= 'A' }
+  |>MultiDict.putIn { lowercase= 'b', uppercase= 'B' }
+  |>MultiDict.putIn { lowercase= 'c', uppercase= 'C' }
 
 uppercase char=
-  KeysDict.access .lowercase char
+  MultiDict.access .lowercase char
     lowerUppercaseLetters
   |>Maybe.map .uppercase
 ```
@@ -66,35 +66,35 @@ type Element=
   Hydrogen
   | Helium
 
-elementAtomicNumberKeysDict=
-  KeysDict.fromList
+elementAtomicNumberMultiDict=
+  MultiDict.fromValues
     [ unique .atomicNumber, unique .element ]
     [ { element= Hydrogen, atomicNumber= 1 }
     , { element= Helium, atomicNumber= 2 }
     ]
 
 atomicNumberByElement=
-  KeysDict.toDict .element .atomicNumber
-    elementAtomicNumberKeysDict
+  MultiDict.toDict .element .atomicNumber
+    elementAtomicNumberMultiDict
 ```
 
 ## Example: brackets
 You have pairs that belong together:
 ```elm
 brackets=
-  KeysDict.empty [ unique .opening, unique .closing ]
-  |>KeysDict.putIn { opening= '(', closing= ')' }
-  |>KeysDict.putIn { opening= '{', closing= '}' }
+  MultiDict.empty [ unique .opening, unique .closing ]
+  |>MultiDict.putIn { opening= '(', closing= ')' }
+  |>MultiDict.putIn { opening= '{', closing= '}' }
 
 typeChar character=
-  case KeysDict.access .open character brackets of
+  case MultiDict.access .open character brackets of
     Just { closed }->
-      String.fromList [ character, closed ]
+      String.fromValues [ character, closed ]
 
     Nothing->
-      case KeysDict.access .closed character brackets of
+      case MultiDict.access .closed character brackets of
         Just \{ open }->
-          String.fromList [ open, character ]
+          String.fromValues [ open, character ]
           
         Nothing->
           String.fromChar character
@@ -104,12 +104,12 @@ typeChar character=
 &nbsp;
 
 
-## 👎 How not to `KeysDict`
+## 👎 How not to `MultiDict`
 
 ## Example: automatic answers
 ```elm
 answers=
-  KeysDict.fromList [ unique .youSay ]
+  MultiDict.fromValues [ unique .youSay ]
     [ { youSay= "Hi", answer= "Hi there!" }
     , { youSay= "Bye", answer=  "Ok, have a nice day and spread some love." }
     , { youSay= "How are you", answer= "I don't have feelings :(" }
@@ -123,13 +123,13 @@ please use a `Dict` where it is more appropriate: **`Dict`s are for one-way acce
 ## Example: translation, synonymes...
 ```elm
 englishGerman=
-  KeysDict.fromList []
+  MultiDict.fromValues []
     [ { english= "elm", german= "Ulme" }
     , { english= "git", german= "Schwachkopf" }
     , { german= "Rüster", english= "elm" }
     ]
 ```
-A `KeysDict` is only effective, when there is **only one unique key**.
+A `MultiDict` is only effective, when there is **only one unique key**.
 
 Please take a look at [elm-bidict](https://github.com/Janiczek/elm-bidict) instead!
 
@@ -138,10 +138,10 @@ Please take a look at [elm-bidict](https://github.com/Janiczek/elm-bidict) inste
 Similar to the previous example:
 ```elm
 partners=
-  KeysDict.empty [ unique .partner, unique .partnerOfPartner ]
-  |>KeysDict.putIn { partner= "Ann", partnerOfPartner= "Alan" }
-  |>KeysDict.putIn { partner= "Alex", partnerOfPartner= "Alastair" }
-  |>KeysDict.putIn { partner= "Alan", partnerOfPartner= "Ann" }
+  MultiDict.empty [ unique .partner, unique .partnerOfPartner ]
+  |>MultiDict.putIn { partner= "Ann", partnerOfPartner= "Alan" }
+  |>MultiDict.putIn { partner= "Alex", partnerOfPartner= "Alastair" }
+  |>MultiDict.putIn { partner= "Alan", partnerOfPartner= "Ann" }
       --wait, this is no duplicate and is inserted
 ```
-A `KeysDict` ony makes sense, when the **keys describe something different**.
+A `MultiDict` ony makes sense, when the **keys describe something different**.

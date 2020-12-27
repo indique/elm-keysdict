@@ -1,10 +1,10 @@
-module KeysDictTests exposing (suite)
+module Tests exposing (suite)
 
 
 import Test exposing (Test, test, describe)
 import Expect
 
-import KeysDict exposing (KeysDict, Uniqueness, empty, unique)
+import MultiDict exposing (KeysDict, Uniqueness, empty, unique)
 import AssocList as AssocDict exposing (Dict)
 
 import Json.Encode as Encode
@@ -48,7 +48,7 @@ type alias BracketMatch=
 
 brackets: KeysDict BracketMatch
 brackets=
-  KeysDict.fromList [ unique .open, unique .closed ]
+  KeysDict.fromValues [ unique .open, unique .closed ]
     [ { open= '(', closed= ')' }
     , { open= '{', closed= '}' }
     ]
@@ -61,22 +61,22 @@ type alias CasedLetter=
 createTest: Test
 createTest=
   describe "create"
-    [ describe "fromList is the same as empty |>inserting"
-        [ test "empty  is  fromList []"
+    [ describe "fromValues is the same as empty |>inserting"
+        [ test "empty  is  fromValues []"
           <|\()->
               KeysDict.equal
                 (empty [ unique .code, unique .char ])
-                (KeysDict.fromList [ unique .code, unique .char ] [])
-              |>Expect.true "empty equal to fromList []"
-        , test "fromList gives same result as inserting"
+                (KeysDict.fromValues [ unique .code, unique .char ] [])
+              |>Expect.true "empty equal to fromValues []"
+        , test "fromValues gives same result as inserting"
           <|\()->
               KeysDict.equal
                 with2
-                (KeysDict.fromList [ unique .code, unique .char ]
+                (KeysDict.fromValues [ unique .code, unique .char ]
                   listOf2
                 )
-              |>Expect.true "fromList gives same result as inserting"
-        , test "fromList ignores duplicates as in example"
+              |>Expect.true "fromValues gives same result as inserting"
+        , test "fromValues ignores duplicates as in example"
           <|\()->
               let
                 badList=
@@ -88,7 +88,7 @@ createTest=
                   ]
               in
               KeysDict.size
-                (KeysDict.fromList [ unique .lowercase, unique .uppercase ]
+                (KeysDict.fromValues [ unique .lowercase, unique .uppercase ]
                   badList
                 )
               |>Expect.equal 3
@@ -128,7 +128,7 @@ scanScanTest=
           <|\()->
               Expect.equal 42
                 (KeysDict.size
-                  (KeysDict.fromList
+                  (KeysDict.fromValues
                     [ unique Tuple.first, unique Tuple.second ]
                     (List.range 0 41
                     |>List.map (\i-> ( i, i ))
@@ -168,7 +168,8 @@ scanScanTest=
       <|\()->
           let
             letterCodes=
-              KeysDict.fromList [ unique .letter, unique .code ]
+              KeysDict.fromValues
+                [ unique .letter, unique .code ]
                 [ { letter= 'a', code= 97 }
                 , { letter= 'b', code= 98 }
                 ]
@@ -180,7 +181,7 @@ scanScanTest=
           KeysDict.equal
             letterCodes
             fancyCompetingLetterCodes
-          |>Expect.true "reversed list with switched left right fromList equal to fromList"
+          |>Expect.true "reversed list with switched left right fromValues equal to fromValues"
     , describe "emptyOrMore examples work"
         [ test "isEmpty"
           <|\()->
@@ -206,7 +207,8 @@ scanScanTest=
                   }
             in
             mostRecentlyInserted
-              (KeysDict.fromList [ unique .lowercase, unique .uppercase ]
+              (KeysDict.fromValues
+                [ unique .lowercase, unique .uppercase ]
                 [ { lowercase= 'a', uppercase= 'A' },
                   { lowercase= 'b', uppercase= 'B' }
                 ]
@@ -260,22 +262,28 @@ inTest=
           <|\()->
               let
                 result=
-                  KeysDict.empty [ unique .lowercase, unique .uppercase ]
+                  empty [ unique .lowercase, unique .uppercase ]
                     --lowercase and uppercase are unique keys across each value
-                  |>KeysDict.putIn { lowercase= 'b', uppercase= 'B', rating= 0.5 }
+                  |>KeysDict.putIn
+                      { lowercase= 'b', uppercase= 'B', rating= 0.5 }
                       --put in 
-                  |>KeysDict.putIn { lowercase= 'a', uppercase= 'A', rating= 0.5 }
+                  |>KeysDict.putIn
+                      { lowercase= 'a', uppercase= 'A', rating= 0.5 }
                       --put in, because rating is not a key
-                  |>KeysDict.putIn { lowercase= 'b', uppercase= 'C', rating= 0 }
+                  |>KeysDict.putIn
+                      { lowercase= 'b', uppercase= 'C', rating= 0 }
                       --ignored, the left value already exists
-                  |>KeysDict.putIn { lowercase= 'c', uppercase= 'A', rating= 0 }
+                  |>KeysDict.putIn
+                      { lowercase= 'c', uppercase= 'A', rating= 0 }
                       --ignored, the right value already exists
-                  |>KeysDict.putIn { lowercase= 'c', uppercase= 'C', rating= 0.6 }
+                  |>KeysDict.putIn
+                      { lowercase= 'c', uppercase= 'C', rating= 0.6 }
                       --put in
               in
               KeysDict.equal
                 result
-                (KeysDict.fromList [ unique .lowercase, unique .uppercase ]
+                (KeysDict.fromValues
+                  [ unique .lowercase, unique .uppercase ]
                   [ { lowercase= 'c', uppercase= 'C', rating= 0.6 }
                   , { lowercase= 'b', uppercase= 'B', rating= 0.5 }
                   , { lowercase= 'a', uppercase= 'A', rating= 0.5 }
@@ -295,14 +303,17 @@ inTest=
           ]
         validNamedOperators=
           KeysDict.union
-            (KeysDict.fromList [ unique .operator, unique .name ]
+            (KeysDict.fromValues
+              [ unique .operator, unique .name ]
               custumNamedOperators
             )
-            (KeysDict.fromList [ unique .name, unique .operator ]
+            (KeysDict.fromValues
+              [ unique .name, unique .operator ]
               numberNamedOperators
             )
-        fromListOfConcatenated=
-          KeysDict.fromList [ unique .name, unique .operator ]
+        fromValuesOfConcatenated=
+          KeysDict.fromValues
+            [ unique .name, unique .operator ]
             (numberNamedOperators
             ++custumNamedOperators
             )
@@ -321,15 +332,15 @@ inTest=
       test "union example"
       <|\()->
           Expect.true
-            ("union of fromList dicts ("
+            ("union of fromValues dicts ("
             ++(encode validNamedOperators)
-            ++"equal to fromList of concatenated lists ("
-            ++(encode fromListOfConcatenated)
+            ++"equal to fromValues of concatenated lists ("
+            ++(encode fromValuesOfConcatenated)
             ++")"
             )
             (KeysDict.equal
               validNamedOperators
-              fromListOfConcatenated
+              fromValuesOfConcatenated
             )
     ]
 
@@ -361,7 +372,7 @@ shapeTest=
               brackets
               |>KeysDict.fold
                   (\{ open, closed } acc->
-                    acc ++[ String.fromList [ open, closed ] ]
+                    acc ++[ String.fromValues [ open, closed ] ]
                   )
                   []
           in
@@ -384,10 +395,11 @@ shapeTest=
                   [ unique .symbol, unique .name ]
               |>KeysDict.putIn { symbol= "+", name= "plus" }
           in
-          Expect.true "mapped KeysDict equal to fromList"
+          Expect.true "mapped KeysDict equal to fromValues"
             (KeysDict.equal
               mathSymbolNames
-              (KeysDict.fromList [ unique .symbol, unique .name ]
+              (KeysDict.fromValues
+                [ unique .symbol, unique .name ]
                 [ { symbol= "0", name= "zero" }
                 , { symbol= "1", name= "one" }
                 , { symbol= "+", name= "plus" }
@@ -398,7 +410,8 @@ shapeTest=
       <|\()->
           let
             casedLetters=
-              KeysDict.fromList [ unique .lowercase, unique .uppercase ]
+              KeysDict.fromValues
+                [ unique .lowercase, unique .uppercase ]
                 [ { uppercase= 'A', lowercase= 'a' }
                 , { uppercase= 'B', lowercase= 'b' }
                 ]
@@ -406,10 +419,10 @@ shapeTest=
               KeysDict.toDict .uppercase .lowercase
                 casedLetters
           in
-          Expect.true "KeysDict.fromList toDict equal to AssocDict.fromList"
+          Expect.true "KeysDict.fromValues toDict equal to AssocDict.fromValues"
             (AssocDict.eq
               lowerFromUppercase
-              (AssocDict.fromList [ ( 'A', 'a' ), ( 'B', 'b' ) ])
+              (AssocDict.fromValues [ ( 'A', 'a' ), ( 'B', 'b' ) ])
             )
     , encodeDecodeTest
     ]
@@ -465,14 +478,14 @@ readmeExamplesTest=
               |>KeysDict.access .open character
               |>Maybe.map
                   (\{ closed }->
-                    String.fromList [ character, closed ]
+                    String.fromValues [ character, closed ]
                   )
               |>Maybe.withDefault
                   (brackets
                   |>KeysDict.access .closed character
                   |>Maybe.map
                       (\{ open }->
-                        String.fromList [ open, character ]
+                        String.fromValues [ open, character ]
                       )
                   |>Maybe.withDefault
                       (String.fromChar character)
@@ -501,7 +514,7 @@ readmeExamplesTest=
       <|\()->
           let
             elementAtomicNumberPairdict=
-              KeysDict.fromList
+              KeysDict.fromValues
                 [ unique .element, unique .atomicNumber ]
                 [ { element= Hydrogen, atomicNumber= 1 }
                 , { element= Helium, atomicNumber= 2 }

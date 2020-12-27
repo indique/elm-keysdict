@@ -1,9 +1,9 @@
 {
     "type": "package",
-    "name": "indique/elm-keysdict",
-    "summary": "lookup values from many directions",
+    "name": "indique/elm-multidict",
+    "summary": "lookup values by many keys",
     "license": "MIT",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "exposed-modules": [
         "KeysDict"
     ],
