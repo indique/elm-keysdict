@@ -1,11 +1,11 @@
 {
     "type": "package",
     "name": "indique/elm-multidict",
-    "summary": "lookup values by many keys",
+    "summary": "lookup values by multiple keys",
     "license": "MIT",
     "version": "1.0.0",
     "exposed-modules": [
-        "KeysDict"
+        "MultiDict"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
