@@ -2,13 +2,13 @@ module MultiDict exposing
   ( MultiDict
   , Uniqueness, unique
   , equal
-  , empty, fromDict, fromValues
+  , empty, fromItems
   , access, emptyOrMore, size
-  , putIn, map
+  , insert, map
   , remove
   , fold
   , union
-  , toDict
+  , items, toDict
   , encode, decode
   )
 {-|
@@ -17,29 +17,28 @@ module MultiDict exposing
 @docs Uniqueness, unique
 
 ## create
-@docs empty, fromDict, fromValues, decode
+@docs empty, fromDict, fromItems, decode
 
 ## scan
 @docs equal, access, emptyOrMore, size
 
 ## in
-@docs putIn, union
+@docs insert, union
 
 ## out
 @docs remove
 
 ## shape
-@docs fold, map, toDict, encode
+@docs fold, map, items, toDict, encode
 -}
 
-import AssocList as AssocDict
+import AssocList
 
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
-import Json.Decode exposing (value)
 
 
-{-| Want to look up values from many directions?
+{-| Want to look up items from many directions?
 
 > You want the pair where `🗝️` is `1` and the pair where `🔑` is `0`?
 
@@ -64,67 +63,83 @@ Like [assoc-list](https://github.com/pzp1997/assoc-list), a `MultiDict` allows u
     casedLetters: MultiDict CasedLetter
     casedLetters=
       MultiDict.empty [ unique .lowercase, unique .uppercase ]
-      |>MultiDict.putIn { lowercase= 'a', uppercase= 'A' }
-      |>MultiDict.putIn { lowercase= 'b', uppercase= 'B' }
-      |>MultiDict.putIn { lowercase= 'c', uppercase= 'C' }
+      |>MultiDict.insert { lowercase= 'a', uppercase= 'A' }
+      |>MultiDict.insert { lowercase= 'b', uppercase= 'B' }
+      |>MultiDict.insert { lowercase= 'c', uppercase= 'C' }
 
     uppercase char=
       MultiDict.access .lowercase char lowerUppercaseLetters
       |>Maybe.map .uppercase
 -}
-type MultiDict value=
-  ValuesWithPromises
-    (List (Uniqueness value)) (List value)
+type MultiDict item=
+  ItemsWithPromises
+    (List (Uniqueness item)) (List item)
 
-{-| Ensures, that there is not more than one value in the `MultiDict`, where a given condition is `True` (e.g. a given key being equal to a value)
+{-| Ensures, that there is not more than one item in the `MultiDict`, where a given condition is `True` (e.g. a given key being equal to a item)
 
 That sounds a bit complicated, so let's look at some examples.
 
     listWithoutKeys= MultiDict.empty []--no Uniqueness
 
     uniqueInCasedLetter=
-      []
-      |>unique .inAlphabet
-      |>unique .lowercase
-      |>unique .uppercase
+      [ unique .inAlphabet
+      , unique .lowercase
+      , unique .uppercase
+      ]
     
     letters=
-      MultiDict.fromValues uniqueInCasedLetter
+      MultiDict.fromItems uniqueInCasedLetter
         [ { inAlphabet= 0, lowercase= 'a', uppercase= 'A' }
         ]
 -}
-type Uniqueness value=
+type Uniqueness item=
   TrueAtMostOnce
-    (value ->value ->Bool)
+    (item ->item ->Bool)
 
-{-| `accessKey` returns a value, which will be unique in a `MultiDict`.
+{-| `accessKey` returns a item, which will be unique in a `MultiDict`.
 
     MultiDict.empty [ unique .lowercase, unique .uppercase ]
-    |>MultiDict.putIn { lowercase= 'a', uppercase= 'A' }--put in
-    |>MultiDict.putIn { lowercase= 'a', uppercase= 'B' }
-      --checked values: .lowercase exists already! 
+    |>MultiDict.insert { lowercase= 'a', uppercase= 'A' }--put in
+    |>MultiDict.insert { lowercase= 'a', uppercase= 'B' }
+      --checked items: .lowercase exists already! 
       -->MultiDict is unchanged
 -}
-unique: (value ->key) ->Uniqueness value
+unique: (item ->key) ->Uniqueness item
 unique accessKey=
   TrueAtMostOnce
-    (\value-> accessKey >>(==) (accessKey value))
+    (\item-> accessKey >>(==) (accessKey item))
 
 
-{-| Using built-in (==) equality is often not useful in the context of association-dicts.
-
-Do these 2 `MultiDict`s have the same size and identical values (ignoring insertion order)?
+{-| How can you know if each item in `aMultiDict` can also be found in `bMultiDict`?
 
     letterCodes=
-      MultiDict.fromValues [ unique .letter, unique .code ]
+      MultiDict.fromItems
+        [ unique .letter, unique .code ]
         [ { letter= 'a', code= 97 }
         , { letter= 'b', code= 98 }
         ]
     fancyCompetingLetterCodes=
       MultiDict.empty [ unique .code, unique .letter ]
-      |>MultiDict.putIn { code= 98, letter= 'b' }
-      |>MultiDict.putIn { code= 97, letter= 'a' }
-    
+      |>MultiDict.insert { code= 98, letter= 'b' }
+      |>MultiDict.insert { code= 97, letter= 'a' }
+
+    (==) letterCodes fancyCompetingLetterCodes
+> elm crashes
+
+Because a `MultiDict`-`Uniqueness` is defined as a function.
+
+    (==) (MultiDict.items letterCodes)
+      (MultiDict.items fancyCompetingLetterCodes)
+
+> `False`
+
+Even though both contain the same items but in a different order.
+
+#### Summary
+
+- **Don't use `==` to compare `MultiDict`s**
+- Using built-in (`==`) equality isn't helpful in the context of unsorted data structures.
+
     MultiDict.equal
       letterCodes
       fancyCompetingLetterCodes
@@ -133,104 +148,81 @@ Do these 2 `MultiDict`s have the same size and identical values (ignoring insert
     lettersAndCodesInAlphabet
 -}
 equal:
-  MultiDict value ->MultiDict value
+  MultiDict item ->MultiDict item
   ->Bool
 equal aMultiDict bMultiDict=
   bMultiDict
   |>emptyOrMore
       { ifEmpty= isEmpty aMultiDict
       , ifMore=
-          \value->
-            equal (remove identity value aMultiDict)
+          \item->
+            equal (remove identity item aMultiDict)
       }
 
-{-| A `MultiDict` with no values inside and some promises for uniqueness (see `Uniqueness`).
+{-| A `MultiDict` with no items inside and some promises for uniqueness (see `Uniqueness`).
 -}
-empty: List (Uniqueness value) ->MultiDict value
-empty keys=
-  ValuesWithPromises keys []
+empty: List (Uniqueness item) ->MultiDict item
+empty uniqueness=
+  ItemsWithPromises uniqueness []
 
-{-| Create a `MultiDict` from a association-`Dict`.
-If multiple equal keys or values are present, the value **first** in the `Dict` is **prefered** (see `putIn`).
+{-| Create a `MultiDict` _conveniently_ from a list of items & promises for uniqueness (see `Uniqueness`).
+If an item later is't considered unique, the item **first** in the `List` is **prefered** (see `insert`).
     
-    lowerToUpperLetters=
-      AssocList.empty
-      |>AssocList.insert 'a' 'A'
-      |>AssocList.insert 'b' 'B'
-
-    lowerUpperLetters=
-      lowerToUpperLetters
-      |>MultiDict.fromDict
-          (\k v-> { lowercase= k, uppercase= v })
-          [ unique .lowercase, unique .uppercase ]
--}
-fromDict:
-  (key ->dictValue ->value)
-  ->List (Uniqueness value)
-  ->AssocDict.Dict key dictValue
-  ->MultiDict value
-fromDict valueFromKeyValue keys=
-  AssocDict.foldl
-    (\k v-> putIn (valueFromKeyValue k v))
-    (empty keys)
-
-{-| Create a `MultiDict` _conveniently_ from values & some promises for uniqueness (see `Uniqueness`).
-If right or left values are given multiple times, the value **first** in the `List` is **prefered** (see `putIn`).
-    
-    MultiDict.fromValues
+    MultiDict.fromItems
       [ unique .lowercase, unique .uppercase ]
       [ { lowercase= 'b', uppercase= 'B' } --put in
       , { lowercase= 'a', uppercase= 'A' } --put in
       , { lowercase= 'b', uppercase= 'C' }
-          --ignored, as the left value already exists
+          --ignored, as a .lowercase item already exists
       , { lowercase= 'c', uppercase= 'A' }
-          --ignored, as the right value already exists
+          --ignored, as a .uppercase item already exists
       , { lowercase= 'c', uppercase= 'C' } --put in
       ]
 -}
-fromValues:
-  List (Uniqueness value)
-  ->List value ->MultiDict value
-fromValues=
-  List.foldl putIn <<empty
+fromItems:
+  List (Uniqueness item)
+  ->List item ->MultiDict item
+fromItems uniqueness=
+  List.foldl insert (empty uniqueness)
 
 
-{-| `Just` the value in which `key` is present in the `MultiDict`,
-if no value with the `key` is found `Nothing`.
+{-| `Just` the item in which `key` is equal to `accessKey`,
+if no item with the `key` is found `Nothing`.
 
     casedLetters=
       MultiDict.empty [ unique .lowercase, unique .uppercase ]
-      |>MultiDict.putIn { lowercase= 'a', uppercase= 'A' }
-      |>MultiDict.putIn { lowercase= 'b', uppercase= 'B' }
+      |>MultiDict.insert { lowercase= 'a', uppercase= 'A' }
+      |>MultiDict.insert { lowercase= 'b', uppercase= 'B' }
 
     lowercase char=
       MultiDict.access .uppercase char
         casedLetters
       |>Maybe.map .lowercase
+
     uppercase char=
       MultiDict.access .lowercase char
         casedLetters
       |>Maybe.map .uppercase
 
-**Note**: If `accessKey` is not a key,
-`access` will find the most recently inserted value where `accessKey` of the value is `key`.
+**Note**: If `accessKey` isn't promised to be unique,
+`access` will find the most recently inserted item where `accessKey` of the item is `key`.
 
     MultiDict.empty [ unique .lowercase, unique .uppercase ]
-    |>MultiDict.putIn { rating= 0.5, lowercase= 'a', uppercase= 'A' }
-    |>MultiDict.putIn { rating= 0.5, lowercase= 'b', uppercase= 'B' }
+    |>MultiDict.insert { rating= 0.5, lowercase= 'a', uppercase= 'A' }
+    |>MultiDict.insert { rating= 0.5, lowercase= 'b', uppercase= 'B' }
     |>MultiDict.access .rating 0.5
 > `{ rating= 0.5, lowercase= 'b', uppercase= 'B' }`
 -}
 access:
-  (value ->key) ->key
-  ->MultiDict value
-  ->Maybe value
+  (item ->key) ->key
+  ->MultiDict item
+  ->Maybe item
 access accessKey key=
   find (accessKey >>(==) key)
 
 
-{-| `ifEmpty` if the `MultiDict` contains no values,
-else `ifMore` with the most recently inserted value followed by a `MultiDict` with the other values.
+{-| `ifEmpty` if the `MultiDict` contains no items,
+else `ifMore` with the most recently inserted item followed by a `MultiDict` with the previous items.
 
 It has a very similar use case to a `case of` on a `List`.
 
@@ -241,7 +233,7 @@ It has a very similar use case to a `case of` on a `List`.
         }
     mostRecent=
       MultiDict.emptyOrMore
-        { ifMore= \value _-> Just value
+        { ifMore= \item _-> Just item
         , ifEmpty= Nothing
         }
     removeMostRecent MultiDict=
@@ -254,22 +246,22 @@ It has a very similar use case to a `case of` on a `List`.
 emptyOrMore:
   { ifEmpty: result
   , ifMore:
-      value ->MultiDict value ->result
+      item ->MultiDict item ->result
   }
-  ->MultiDict value ->result
+  ->MultiDict item ->result
 emptyOrMore { ifEmpty, ifMore }=
-  \(ValuesWithPromises keys valueList)->
-    case valueList of
+  \(ItemsWithPromises keys list)->
+    case list of
       []->
         ifEmpty
       
-      value ::rest->
-        ifMore value
-          (ValuesWithPromises keys rest)
+      recent ::previous->
+        ifMore recent
+          (ItemsWithPromises keys previous)
 
 {-| **not exposed**, because the usage of `emptyOrMore` should be encouraged
 -}
-isEmpty: MultiDict value ->Bool
+isEmpty: MultiDict item ->Bool
 isEmpty=
   emptyOrMore
     { ifEmpty= True
@@ -277,9 +269,9 @@ isEmpty=
     }
       
 
-{-| How many values there are in a `MultiDict`.
+{-| How many items there are in a `MultiDict`.
 
-    MultiDict.fromValues
+    MultiDict.fromItems
       [ unique .number, unique .following ]
       (List.map (\i-> { number= i, following= i+1 })
         (List.range 0 41)
@@ -287,180 +279,185 @@ isEmpty=
     |>MultiDict.size
 > `42`
 -}
-size: MultiDict value ->Int
+size: MultiDict item ->Int
 size=
-  values >>List.length
+  items >>List.length
 
 
 find:
-  (value ->Bool) ->MultiDict value
-  ->Maybe value
+  (item ->Bool) ->MultiDict item
+  ->Maybe item
 find isThere=
   emptyOrMore
     { ifEmpty= Nothing
     , ifMore=
-        \value rest->
-          case isThere value of
-            True-> Just value
+        \item rest->
+          case isThere item of
+            True->
+              Just item
+
             False->
               find isThere rest
     }
 
 isPresent:
-  (value ->Bool) ->MultiDict value ->Bool
+  (item ->Bool) ->MultiDict item ->Bool
 isPresent isThere=
   find isThere >>(/=) Nothing
 
-keyPresent: value ->MultiDict value ->Bool
-keyPresent value=
-  \((ValuesWithPromises keys _) as multiDict)->
+isntUnique: item ->MultiDict item ->Bool
+isntUnique item=
+  \((ItemsWithPromises keys _) as multiDict)->
     keys
     |>List.map
         (\(TrueAtMostOnce equalKeys)->
-          isPresent (equalKeys value) multiDict
+          isPresent (equalKeys item) multiDict
         )
     |>List.foldl (||) False
 
-{-| Put in a value. This can't be a function or a json.
+{-| Put an item into `multiDict`. _Items cannot contain functions or json_.
 
-If a **key** is already **present**, the `MultiDict` is **unchanged**.
+If the item is'nt unique (e.g. a **key** is already **present**, see `Uniqueness`), the `MultiDict` remains **unchanged**.
 
     MultiDict.empty [ unique .lowercase, unique .uppercase ]
-    |>MultiDict.putIn { lowercase= 'b', uppercase= 'B', rating= 0.5 }
+    |>MultiDict.insert { lowercase= 'b', uppercase= 'B', rating= 0.5 }
         --put in 
-    |>MultiDict.putIn { lowercase= 'a', uppercase= 'A', rating= 0.5 }
+    |>MultiDict.insert { lowercase= 'a', uppercase= 'A', rating= 0.5 }
         --put in, because rating is not a key
-    |>MultiDict.putIn { lowercase= 'b', uppercase= 'C', rating= 0 }
-        --ignored, the left value already exists
-    |>MultiDict.putIn { lowercase= 'c', uppercase= 'A', rating= 0 }
-        --ignored, the right value already exists
-    |>MultiDict.putIn { lowercase= 'c', uppercase= 'C', rating= 0.6 }
+    |>MultiDict.insert { lowercase= 'b', uppercase= 'C', rating= 0 }
+        --ignored, the .lowercase already exists
+    |>MultiDict.insert { lowercase= 'c', uppercase= 'A', rating= 0 }
+        --ignored, the .uppercase already exists
+    |>MultiDict.insert { lowercase= 'c', uppercase= 'C', rating= 0.6 }
         --put in
 -}
-putIn:
-  value ->MultiDict value
-  ->MultiDict value
-putIn value=
-  \multiDict->
-    case keyPresent value multiDict of
-      True->
-        multiDict
+insert:
+  item ->MultiDict item
+  ->MultiDict item
+insert item multiDict=
+  case isntUnique item multiDict of
+    True->
+      multiDict
 
-      False->
-        let
-          (ValuesWithPromises keys valueList)= multiDict
-        in
-        ValuesWithPromises keys
-          (value ::(values multiDict))
+    False->
+      multiDict
+      |>\(ItemsWithPromises keys itemList)->
+          ItemsWithPromises keys
+            (item ::itemList)
 
 
-{-| Combine 2 `MultiDict`s, so that the values in `toInsert` are put into `preferred`.
-If a value on the left or right is present, prefer the last `MultiDict` (see `putIn`).
+{-| Combine 2 `MultiDict`s, so that the items in `toInsert` are put into `preferred`.
+If an item isn't unique (see `Uniqueness`), prefer the last `MultiDict` (see `insert`).
 
     numberNamedOperators=
-      MultiDict.fromValues .name .operator
+      MultiDict.fromItems
+        [ unique .name, unique .operator ]
         [ { operator= '+', name= "plus" }
         , { operator= '-', name= "minus" }
         ]
     customNamedOperators=
-      MultiDict.fromValues .operator .name
+      MultiDict.fromItems
+        [ unique .operator, unique .name ]
         [ { operator= '∧', name= "and" }
         , { operator= '∨', name= "or" }
         , { operator= '-', name= "negate" }
         ]
     validNamedOperators=
       MultiDict.union
-        custumNamedOperators --has a '-' left
-        numberOperatorNames --preferred → its '-'-value is put in
+        custumNamedOperators --has a '-' .operator
+        numberOperatorNames
+        --preferred → uniqueness for .operator
+        --→ custumNamedOperators's '-'-item is ignored
 -}
 union:
-  MultiDict value
-  ->MultiDict value
-  ->MultiDict value
+  MultiDict item
+  ->MultiDict item
+  ->MultiDict item
 union toInsert preferred=
-  (fold putIn preferred) toInsert
+  (fold insert preferred) toInsert
 
-{-| Reduce the values
-from most recently putIned to least recently inserted.
+{-| Reduce the items from most recently inserted to least recently inserted.
 
 A fold in the other direction doesn't exist, as association-`Dict`s should rarely rely on order (see `equal`).
 
     brackets=
-      MultiDict.empty
-      |>MultiDict.putIn ( '(', ')' )
-      |>MultiDict.putIn ( '{', '}' )
+      MultiDict.empty [ unique .open, unique .closed ]
+      |>MultiDict.insert { open= '(', closed= ')' }
+      |>MultiDict.insert { open= '{', closed= '}' }
 
     openingAndClosing=
       brackets
       |>MultiDict.fold
-          (\( left, right ) acc->
-            acc++[ String.fromValues [ left, right ] ]
+          (\{ open, closed }->
+            (::) (String.fromList [ open, closed ])
           )
           []
-> `[ "{}", "()" ]`
+> `[ "()", "{}" ]`
 -}
 fold:
-  (value ->acc ->acc)
-  ->acc ->MultiDict value ->acc
+  (item ->acc ->acc)
+  ->acc ->MultiDict item ->acc
 fold reduce initial=
-  values
+  items
   >>List.foldl reduce initial
 
 
-{-| Remove the value at the `key`.
+{-| Remove the item at the `key`.
 If **the key does not exist**, the `MultiDict` is **unchanged**
 
     openClosedBrackets=
-      MultiDict.empty .open .closed
-      |>MultiDict.putIn { open= "(", closed= ")" }
+      MultiDict.empty [ unique .open, unique .closed ]
+      |>MultiDict.insert { open= "(", closed= ")" }
 
     openClosedBrackets
     |>MultiDict.remove .open ")" 
-        --unchanged, ")" is not a open value
+        --unchanged, ")" is not a open item
     |>MultiDict.remove .open "("
 > `MultiDict.empty`
 
     openClosedBrackets
     |>MultiDict.remove .closed "("
-        --unchanged, "(" is not a closed value
+        --unchanged, "(" is not a closed item
     |>MultiDict.remove .closed ")"
 > `MultiDict.empty`
 
-**Notice:** If you don't specify `accessValue` as `left` or `right`, it acts as a normal filter
+**Notice:** If there is no promise of `Uniqueness` for `accessKey`, `remove` acts as a normal filter.
 
     MultiDict.empty [ unique .open, unique .closed ]
-    |>MultiDict.putIn
+    |>MultiDict.insert
         { open= "(", closed= ")", meaning= Nothing }
-    |>MultiDict.putIn
+    |>MultiDict.insert
         { open= "[", closed= "]", meaning= Just (List Element) }
-    |>MultiDict.putIn
+    |>MultiDict.insert
         { open= "<, closed= ">", meaning= Nothing }
     |>MultiDict.remove .meaning Nothing
 -}
 remove:
-  (value ->key) ->key
-  ->MultiDict value
-  ->MultiDict value
+  (item ->key) ->key
+  ->MultiDict item
+  ->MultiDict item
 remove accessKey key=
-  \(ValuesWithPromises keys valueList)->
-    ValuesWithPromises
+  \(ItemsWithPromises keys itemList)->
+    ItemsWithPromises
       keys
       (List.filter
-        (\value-> (/=) (accessKey value) key)
-        valueList
+        (\item-> (/=) (accessKey item) key)
+        itemList
       )
 
 
-values: MultiDict value ->List value
-values=
-  \(ValuesWithPromises _ valueList)-> valueList
+{-| The `List` containing all items from most recently (= head) to least recently inserted item.
+-}
+items: MultiDict item ->List item
+items=
+  \(ItemsWithPromises _ itemList)-> itemList
 
-{-| Map all values.
+{-| Map all items.
 
     digitNames=
       MultiDict.empty [ unique .number, unique .name ]
-      |>MultiDict.putIn { number= 0, name= "zero" }
-      |>MultiDict.putIn { number= 1, name= "one" }
+      |>MultiDict.insert { number= 0, name= "zero" }
+      |>MultiDict.insert { number= 1, name= "one" }
 
     mathSymbolNames=
       digitNames
@@ -468,22 +465,23 @@ values=
           (\{ number, name }->
             { symbol= String.fromInt number, name= name }
           )
-      |>MultiDict.putIn { symbol= "+", name= "plus" }
+      |>MultiDict.insert { symbol= "+", name= "plus" }
 -}
 map:
-  (value ->resultValue)
-  ->List (Uniqueness resultValue)
-  ->MultiDict value
-  ->MultiDict resultValue
-map alter resultKeys=
-  empty resultKeys
-  |>fold (alter >>putIn)
+  (item ->resultItem)
+  ->List (Uniqueness resultItem)
+  ->MultiDict item
+  ->MultiDict resultItem
+map alter resultUniqueness=
+  empty resultUniqueness
+  |>fold (alter >>insert)
 
 
 {-| Convert a `MultiDict` to an association-`Dict`.
 
     casedLetters=
-      MultiDict.fromValues .lowercase .uppercase
+      MultiDict.fromItems
+        [ unique .lowercase, unique .uppercase ]
         [ { uppercase= 'A', lowercase= 'a' }
         , { uppercase= 'B', lowercase= 'b' }
         ]
@@ -492,23 +490,23 @@ map alter resultKeys=
         casedLetters
 -}
 toDict:
-  (value ->dictKey) ->(value ->dictValue)
-  ->MultiDict value
-  ->AssocDict.Dict dictKey dictValue
+  (item ->dictKey) ->(item ->dictValue)
+  ->MultiDict item
+  ->AssocList.Dict dictKey dictValue
 toDict toKey toValue=
   fold
-    (\value->
-      AssocDict.insert
-        (toKey value) (toValue value)
+    (\item->
+      AssocList.insert
+        (toKey item) (toValue item)
     )
-    AssocDict.empty
+    AssocList.empty
 
 {-| Convert a `MultiDict` to a `Json.Encode.Value`.
 
     someMultiDict=
       MultiDict.empty
-      |>MultiDict.putIn ( 1, 11 )
-      |>MultiDict.putIn ( 2, 22 )
+      |>MultiDict.insert ( 1, 11 )
+      |>MultiDict.insert ( 2, 22 )
     Encode.encode 1
       (MultiDict.encode
         Encode.int Encode.int
@@ -529,10 +527,10 @@ toDict toKey toValue=
     """
 -}
 encode:
-  (value ->Encode.Value)
-  ->MultiDict value ->Encode.Value
+  (item ->Encode.Value)
+  ->MultiDict item ->Encode.Value
 encode encodeValue=
-  values
+  items
   >>Encode.list encodeValue
 
 {-| A `Json.Decode.Decoder` for `MultiDict`s encoded by `encode`.
@@ -570,14 +568,14 @@ The order of insertion is not reconstructed (see `equal`)
           decodeNamedNumber
         )
 
-> `Ok (ValuesWithKeys [ { number= 1, name= "one" }, { number= 2, name= "two" } ])`
+> `Ok (ItemsWithKeys [ { number= 1, name= "one" }, { number= 2, name= "two" } ])`
 > = a `MultiDict`
 -}
 decode:
-  List (Uniqueness value)
-  ->Decoder value
-  ->Decoder (MultiDict value)
-decode keys decodeValue=
-  Decode.map (fromValues keys)
-    (Decode.list decodeValue)
+  List (Uniqueness item)
+  ->Decoder item
+  ->Decoder (MultiDict item)
+decode keys decodeItem=
+  Decode.map (fromItems keys)
+    (Decode.list decodeItem)
 

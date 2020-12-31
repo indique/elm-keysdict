@@ -49,9 +49,9 @@ type alias CasedLetter=
 lowerUppercaseLetters: MultiDict CasedLetter
 lowerUppercaseLetters=
   MultiDict.empty [ unique .lowercase, unique .uppercase ]
-  |>MultiDict.putIn { lowercase= 'a', uppercase= 'A' }
-  |>MultiDict.putIn { lowercase= 'b', uppercase= 'B' }
-  |>MultiDict.putIn { lowercase= 'c', uppercase= 'C' }
+  |>MultiDict.insert { lowercase= 'a', uppercase= 'A' }
+  |>MultiDict.insert { lowercase= 'b', uppercase= 'B' }
+  |>MultiDict.insert { lowercase= 'c', uppercase= 'C' }
 
 uppercase char=
   MultiDict.access .lowercase char
@@ -83,8 +83,8 @@ You have pairs that belong together:
 ```elm
 brackets=
   MultiDict.empty [ unique .opening, unique .closing ]
-  |>MultiDict.putIn { opening= '(', closing= ')' }
-  |>MultiDict.putIn { opening= '{', closing= '}' }
+  |>MultiDict.insert { opening= '(', closing= ')' }
+  |>MultiDict.insert { opening= '{', closing= '}' }
 
 typeChar character=
   case MultiDict.access .open character brackets of
@@ -139,9 +139,9 @@ Similar to the previous example:
 ```elm
 partners=
   MultiDict.empty [ unique .partner, unique .partnerOfPartner ]
-  |>MultiDict.putIn { partner= "Ann", partnerOfPartner= "Alan" }
-  |>MultiDict.putIn { partner= "Alex", partnerOfPartner= "Alastair" }
-  |>MultiDict.putIn { partner= "Alan", partnerOfPartner= "Ann" }
+  |>MultiDict.insert { partner= "Ann", partnerOfPartner= "Alan" }
+  |>MultiDict.insert { partner= "Alex", partnerOfPartner= "Alastair" }
+  |>MultiDict.insert { partner= "Alan", partnerOfPartner= "Ann" }
       --wait, this is no duplicate and is inserted
 ```
 A `MultiDict` ony makes sense, when the **keys describe something different**.
