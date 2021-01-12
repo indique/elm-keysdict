@@ -13,18 +13,18 @@
 ### Summary Guide
 
 commits look like this:
-> do it: details | other action: details
+> do details | act other details
 
 #### Category
-| mark      | means   |
-| :-------  | :------ |
-| +: ...    | add     |
-| -: ...    | remove  |
-| +-: ...   | change  |
-| ↻: ...    | update  |
-| ✓: ...    | correct |
-| -<: ...   | split   |
-| >-: ...   | merge   |
+| mark     | means   |
+| :------  | :------ |
+| + ...    | add     |
+| - ...    | remove  |
+| +- ...   | change  |
+| ↻ ...    | update  |
+| ✓ ...    | correct |
+| -< ...   | split   |
+| >- ...   | merge   |
 
 #### Others
 | mark        | means         |
