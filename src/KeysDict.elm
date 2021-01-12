@@ -78,7 +78,7 @@ So... If you have a key and the type of door it could match, you can find the on
 @docs enterableBy
 
 ## scan
-@docs equal, enterBy, noOrManyHouses, NoOrManyHouses, countHouses
+@docs equal, enterBy, countHouses
 
 ## put up & tear down houses
 @docs putUp, tearDown
