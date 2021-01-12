@@ -4,9 +4,14 @@ import Benchmark.Runner exposing (BenchmarkProgram)
 import Benchmark exposing
   ( Benchmark, benchmark, describe )
 
-import AssocList as AssocDict
+import AssocList
+import Util exposing
+  ( aspect
+  , removeFirstWithResult, ListOperationResult(..)
+  )
 
-import MultiDict exposing (MultiDict, unique)
+import KeysDict.Uniqueness exposing (door)
+import KeysDict exposing (KeysDict, houses, putUp)
 
 
 main: BenchmarkProgram
@@ -15,7 +20,7 @@ main=
 
 suite: Benchmark
 suite=
-  describe "multi-dict"
+  describe "keys-dict"
     [ equal
     , fold
     ]
@@ -41,58 +46,61 @@ casedLetterList=
         }
       )
 
-multiDict: MultiDict CasedLetter
-multiDict=
-  MultiDict.fromItems
-    [ unique .lowercase, unique .uppercase ]
-    casedLetterList
+keysDict: KeysDict CasedLetter
+keysDict=
+  casedLetterList
+  |>List.foldl putUp
+      (KeysDict.enterableBy
+        [ door .lowercase, door .uppercase ]
+      )
+    
 
 
 fold: Benchmark
 fold=
   Benchmark.compare "fold"
-    "MultiDict.fold"
-    (\()-> MultiDict.fold (::) [] multiDict)
+    "foldHouses"
+    (\()-> KeysDict.foldHouses (::) [] keysDict)
     "foldr"
-    (\()-> foldr (::) [] multiDict)
+    (\()-> foldr (::) [] keysDict)
 
 foldr reduce initial=
-  MultiDict.items
+  houses
   >>List.foldr reduce initial
 
 
-multiDictReversed: MultiDict CasedLetter
-multiDictReversed=
-  MultiDict.fromItems
-    [ unique .uppercase, unique .lowercase ]
-    (casedLetterList |>List.reverse)
+keysDictReversed: KeysDict CasedLetter
+keysDictReversed=
+  casedLetterList |>List.reverse
+  |>List.foldl putUp
+      (KeysDict.enterableBy
+        [ door .uppercase, door .lowercase ]
+      )
 
 equal: Benchmark
 equal=
   Benchmark.compare "equal <?> alternative equals"
     "equal"
     (\()->
-      MultiDict.equal multiDict multiDictReversed
+      KeysDict.equal keysDict keysDictReversed
     )
     "altEqual"
     (\()->
-      altEqual multiDict multiDictReversed
+      altEqual keysDict keysDictReversed
     )
 
 
 altEqual:
-  MultiDict CasedLetter ->MultiDict CasedLetter
+  KeysDict CasedLetter ->KeysDict CasedLetter
   ->Bool
-altEqual aMultiDict bMultiDict=
-  equalLists
-    (MultiDict.items aMultiDict)
-    (MultiDict.items bMultiDict)
+altEqual=
+  (aspect houses) equalLists
 
 equalLists: List el ->List el ->Bool
 equalLists aList bList=
   case aList of
     head ::aNextValues->
-      case removeWithResult head bList of
+      case removeFirstWithResult head bList of
         ChangedList aWithout->
           equalLists aNextValues aWithout
         
@@ -101,33 +109,4 @@ equalLists aList bList=
 
     []->
       List.isEmpty bList
-          
-
-{-| Remove the first element (left to right) in a `List` where `toRemove` is equal.
--}
-removeWithResult:
-  el ->List el ->ListOperationResult el
-removeWithResult toRemove=
-  removeWithResultHelp toRemove []
-
-removeWithResultHelp:
-  el ->List el ->List el
-  ->ListOperationResult el
-removeWithResultHelp toRemove notToRemove list=
-  case list of
-    []-> AsBeforeList []
-
-    head ::after->
-      case (==) toRemove head of
-        True->
-          ChangedList
-            ((notToRemove |>List.reverse) ++after)
-
-        False->
-          removeWithResultHelp
-            toRemove (head ::notToRemove) after
-
-type ListOperationResult el=
-  AsBeforeList (List el)
-  | ChangedList (List el)
 
