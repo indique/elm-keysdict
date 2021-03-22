@@ -65,7 +65,7 @@ So... If you have a key and the type of door it could match, you can find the on
 
 ## 👍 How to `KeysDict`
 
-Try the [ellie for some examples](https://ellie-app.com/bSmccsw3Rz2a1) (always a version behind).
+Try the [ellie for some examples](https://ellie-app.com/cHj9Fy9bpXMa1) (always a version behind).
 
 ## Example: cased letters
 ```elm
