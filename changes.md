@@ -1,3 +1,7 @@
+> **Moved to [lue-bird/elm-keysset](https://package.elm-lang.org/packages/lue-bird/elm-keysset/latest/)**
+
+&nbsp;
+
 ## 1.0.1
 
 - update ellie examples
