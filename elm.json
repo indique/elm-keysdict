@@ -3,7 +3,7 @@
     "name": "indique/elm-keysdict",
     "summary": "lookup values by many keys",
     "license": "MIT",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "exposed-modules": [
         "KeysDict",
         "KeysDict.Uniqueness"
