@@ -1,3 +1,5 @@
+**Moved to [lue-bird/elm-keysset](https://package.elm-lang.org/packages/lue-bird/elm-keysset/latest/)**
+
 # KeysDict
 Have many keys to lookup values.
 
